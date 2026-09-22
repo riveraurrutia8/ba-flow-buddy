@@ -14,7 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      criterios_aceptacion: {
+        Row: {
+          created_at: string
+          descripcion: string
+          estado: string
+          historia_usuario_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion: string
+          estado?: string
+          historia_usuario_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string
+          estado?: string
+          historia_usuario_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "criterios_aceptacion_historia_usuario_id_fkey"
+            columns: ["historia_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "historias_usuario"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historias_usuario: {
+        Row: {
+          beneficio: string | null
+          codigo: string | null
+          created_at: string
+          estado: string
+          id: string
+          necesidad: string | null
+          prioridad: string
+          proyecto_id: string
+          rol: string | null
+          titulo: string
+        }
+        Insert: {
+          beneficio?: string | null
+          codigo?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          necesidad?: string | null
+          prioridad?: string
+          proyecto_id: string
+          rol?: string | null
+          titulo: string
+        }
+        Update: {
+          beneficio?: string | null
+          codigo?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          necesidad?: string | null
+          prioridad?: string
+          proyecto_id?: string
+          rol?: string | null
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historias_usuario_proyecto_id_fkey"
+            columns: ["proyecto_id"]
+            isOneToOne: false
+            referencedRelation: "proyectos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proyectos: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          estado: string
+          fecha_inicio: string | null
+          fecha_objetivo: string | null
+          id: string
+          nombre: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fecha_inicio?: string | null
+          fecha_objetivo?: string | null
+          id?: string
+          nombre: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fecha_inicio?: string | null
+          fecha_objetivo?: string | null
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
