@@ -69,7 +69,7 @@ const widthClasses = [
 function getWidthClass(value: number, maximum: number) {
   if (value === 0 || maximum === 0) return widthClasses[0];
   const step = Math.max(1, Math.ceil((value / maximum) * 10));
-  return widthClasses[step];
+  return widthClasses[step] ?? widthClasses[10];
 }
 
 function BreakdownPanel({
@@ -148,7 +148,7 @@ function Dashboard() {
 
   return (
     <div>
-      <div className="mb-6 border-b border-border pb-5">
+      <div className="mb-6 border-b border-border pb-5 [&>div]:mb-0">
         <PageHeader title="Dashboard" description="Visión general del trabajo de análisis." />
       </div>
 
