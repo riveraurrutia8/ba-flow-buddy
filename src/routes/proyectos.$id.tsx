@@ -61,10 +61,13 @@ function ProyectoDetalle() {
 
   const delProyecto = useMutation({
     mutationFn: () => api.deleteProyecto(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["proyectos"] });
+    onSuccess: async () => {
       toast.success("Proyecto eliminado correctamente.");
-      navigate({ to: "/proyectos" });
+      // Salir del detalle antes de invalidar, para no volver a pedir el proyecto eliminado.
+      await navigate({ to: "/proyectos" });
+      qc.removeQueries({ queryKey: ["proyectos", id] });
+      qc.invalidateQueries({ queryKey: ["proyectos"] });
+      qc.invalidateQueries({ queryKey: ["historias"] });
     },
     onError: (e: Error) => toast.error(`No se pudo eliminar el proyecto: ${e.message}`),
   });
@@ -117,7 +120,7 @@ function ProyectoDetalle() {
       />
 
       <Card>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">
           <Info label="Estado">
             <StatusBadge value={p.estado} kind="proyecto" />
           </Info>
@@ -156,7 +159,7 @@ function ProyectoDetalle() {
         <div className="grid gap-3">
           {items.map((h) => (
             <Card key={h.id}>
-              <CardContent className="flex flex-wrap items-start justify-between gap-4">
+              <CardContent className="flex flex-wrap items-start justify-between gap-4 pt-6">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     {h.codigo && (
@@ -176,7 +179,7 @@ function ProyectoDetalle() {
                     Como {h.rol || "—"}, quiero {h.necesidad || "—"}, para {h.beneficio || "—"}.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge value={h.prioridad} kind="prioridad" />
                   <StatusBadge value={h.estado} kind="historia" />
                   <Button

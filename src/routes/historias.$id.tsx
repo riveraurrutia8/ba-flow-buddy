@@ -112,7 +112,7 @@ function HistoriaDetalle() {
       />
 
       <Card>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <p className="text-lg leading-relaxed text-foreground">
             Como <strong className="font-semibold">{h.rol || "—"}</strong>, quiero{" "}
             <strong className="font-semibold">{h.necesidad || "—"}</strong>, para{" "}
@@ -130,7 +130,7 @@ function HistoriaDetalle() {
       </h2>
 
       <Card className="mb-4">
-        <CardContent>
+        <CardContent className="pt-6">
           <form
             className="flex flex-wrap gap-2"
             onSubmit={(e) => {
@@ -170,7 +170,7 @@ function HistoriaDetalle() {
         <div className="grid gap-3">
           {items.map((c) => (
             <Card key={c.id}>
-              <CardContent className="flex flex-wrap items-start justify-between gap-3">
+              <CardContent className="flex flex-wrap items-start justify-between gap-3 pt-6">
                 {editingId === c.id ? (
                   <div className="flex w-full flex-wrap gap-2">
                     <Input
@@ -198,7 +198,7 @@ function HistoriaDetalle() {
                 ) : (
                   <>
                     <p className="min-w-0 flex-1 text-sm text-foreground">{c.descripcion}</p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <StatusBadge value={c.estado} kind="criterio" />
                       <Button
                         variant="outline"
