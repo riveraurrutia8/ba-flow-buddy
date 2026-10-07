@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -22,8 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAvisoCambioEstado } from "@/hooks/use-cambio-estado";
 import { api, ESTADOS_HISTORIA, PRIORIDADES, type Historia } from "@/lib/baflow";
-import { notificarCambioEstado } from "@/lib/notificaciones.functions";
 
 type FormState = {
   codigo: string;
@@ -66,60 +65,7 @@ export function HistoriaDialog({
     queryFn: api.listMiembros,
     enabled: open,
   });
-  const notificar = useServerFn(notificarCambioEstado);
-
-  async function avisarCambioEstado(guardada: Historia, estadoAnterior: string) {
-    const aviso = toast.loading("Notificando el cambio de estado y analizando la historia…");
-    const res = await enviarCambioEstado(guardada, estadoAnterior).catch(() => null);
-    if (!res?.enviado) {
-      toast.dismiss(aviso);
-      return;
-    }
-    if (!res.analisis) {
-      toast.success("Equipo notificado por Telegram.", { id: aviso });
-      return;
-    }
-    const analisis = { ...res.analisis, estado: guardada.estado, fecha: new Date().toISOString() };
-    qc.setQueryData(["analisis", guardada.id], analisis);
-    const opciones = { id: aviso, description: analisis.resumen, duration: 10_000 };
-    if (analisis.riesgo === "Alto") {
-      toast.warning(`Riesgo ALTO detectado por la IA en "${guardada.titulo}"`, opciones);
-    } else {
-      toast.success(`Análisis de IA: riesgo ${analisis.riesgo}`, opciones);
-    }
-  }
-
-  async function enviarCambioEstado(guardada: Historia, estadoAnterior: string) {
-    const proyecto = await qc
-      .fetchQuery({
-        queryKey: ["proyectos", proyectoId],
-        queryFn: () => api.getProyecto(proyectoId),
-      })
-      .catch(() => null);
-    const criterios = await qc
-      .fetchQuery({
-        queryKey: ["criterios", guardada.id],
-        queryFn: () => api.listCriterios(guardada.id),
-      })
-      .catch(() => []);
-    return notificar({
-      data: {
-        historia_id: guardada.id,
-        codigo: guardada.codigo,
-        titulo: guardada.titulo,
-        rol: guardada.rol,
-        necesidad: guardada.necesidad,
-        beneficio: guardada.beneficio,
-        criterios: criterios.map((c) => ({ descripcion: c.descripcion, estado: c.estado })),
-        proyecto: proyecto?.nombre ?? null,
-        prioridad: guardada.prioridad,
-        responsable: miembros?.find((m) => m.id === guardada.responsable_id)?.nombre ?? null,
-        estado_anterior: estadoAnterior,
-        estado_nuevo: guardada.estado,
-        url: `${window.location.origin}/historias/${guardada.id}`,
-      },
-    });
-  }
+  const avisarCambioEstado = useAvisoCambioEstado();
 
   useEffect(() => {
     if (!open) return;

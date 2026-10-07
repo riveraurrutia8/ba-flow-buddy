@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { ChevronRight, LayoutGrid, Workflow, Menu, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
@@ -71,6 +71,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  // El espacio de proyecto usa más ancho para que el tablero muestre sus 6 columnas.
+  const espacioAncho = useRouterState({
+    select: (s) => s.location.pathname.startsWith("/proyectos/"),
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -99,7 +103,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavLinks onNavigate={() => setOpen(false)} />
           </div>
         )}
-        <main className={cn("mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8")}>{children}</main>
+        <main
+          className={cn(
+            "mx-auto w-full px-4 py-8 sm:px-6 lg:px-8",
+            espacioAncho ? "max-w-[1600px]" : "max-w-6xl",
+          )}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

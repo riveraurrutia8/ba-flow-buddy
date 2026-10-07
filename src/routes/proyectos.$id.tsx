@@ -5,6 +5,8 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Columns3,
+  List,
   ListChecks,
   Pencil,
   Plus,
@@ -16,11 +18,20 @@ import { toast } from "sonner";
 import { EmptyState, Migas } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
+import { Iniciales } from "@/components/Iniciales";
 import { ProyectoDialog } from "@/components/ProyectoDialog";
 import { BarraAvance, BarraEstados, LeyendaEstados } from "@/components/ProyectoMetricas";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TableroBacklog } from "@/components/TableroBacklog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -31,6 +42,7 @@ import {
   type Historia,
   type Miembro,
 } from "@/lib/baflow";
+import { useMoverHistoria } from "@/hooks/use-cambio-estado";
 import { diasRestantes, resumenProyecto, TONO_ESTADO } from "@/lib/metricas";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +81,8 @@ function EspacioProyecto() {
   const [editingHistoria, setEditingHistoria] = useState<Historia | null>(null);
   const [historiaToDelete, setHistoriaToDelete] = useState<Historia | null>(null);
   const [confirmProyecto, setConfirmProyecto] = useState(false);
+  const [vista, setVista] = useState<"tablero" | "lista">("tablero");
+  const mover = useMoverHistoria(id);
 
   const proyecto = useQuery({ queryKey: ["proyectos", id], queryFn: () => api.getProyecto(id) });
   const historias = useQuery({
@@ -134,6 +148,11 @@ function EspacioProyecto() {
   const porId = new Map((miembros.data ?? []).map((m) => [m.id, m]));
   const dias = diasRestantes(p.fecha_objetivo);
   const cargandoBacklog = historias.isLoading || criterios.isLoading;
+
+  const editarHistoria = (h: Historia) => {
+    setEditingHistoria(h);
+    setHistoriaDialog(true);
+  };
 
   const nuevaHistoria = () => {
     setEditingHistoria(null);
@@ -218,11 +237,40 @@ function EspacioProyecto() {
         <TabsContent value="backlog" className="mt-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              Historias agrupadas por estado, de la idea a la entrega.
+              {vista === "tablero"
+                ? "Arrastra las historias entre columnas o usa las flechas para cambiar su estado."
+                : "Cambia el estado de cada historia desde su selector."}
             </p>
-            <Button onClick={nuevaHistoria}>
-              <Plus className="size-4" /> Nueva historia
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                role="group"
+                aria-label="Vista del backlog"
+                className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5"
+              >
+                {(["tablero", "lista"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={vista === v}
+                    onClick={() => setVista(v)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+                      vista === v && "bg-card text-foreground shadow-xs",
+                    )}
+                  >
+                    {v === "tablero" ? (
+                      <Columns3 className="size-4" />
+                    ) : (
+                      <List className="size-4" />
+                    )}
+                    {v === "tablero" ? "Tablero" : "Lista"}
+                  </button>
+                ))}
+              </div>
+              <Button onClick={nuevaHistoria}>
+                <Plus className="size-4" /> Nueva historia
+              </Button>
+            </div>
           </div>
           {cargandoBacklog ? (
             <div className="space-y-3">
@@ -240,6 +288,15 @@ function EspacioProyecto() {
                   <Plus className="size-4" /> Nueva historia
                 </Button>
               }
+            />
+          ) : vista === "tablero" ? (
+            <TableroBacklog
+              proyectoId={id}
+              historias={items}
+              criteriosPorHistoria={r.criteriosPorHistoria}
+              miembros={porId}
+              onEditar={editarHistoria}
+              onEliminar={setHistoriaToDelete}
             />
           ) : (
             <div className="space-y-6">
@@ -259,10 +316,8 @@ function EspacioProyecto() {
                           h={h}
                           responsable={h.responsable_id ? porId.get(h.responsable_id) : undefined}
                           criterios={r.criteriosPorHistoria.get(h.id) ?? []}
-                          onEditar={() => {
-                            setEditingHistoria(h);
-                            setHistoriaDialog(true);
-                          }}
+                          onCambiarEstado={(estado) => mover.mutate({ historia: h, estado })}
+                          onEditar={() => editarHistoria(h)}
                           onEliminar={() => setHistoriaToDelete(h)}
                         />
                       ))}
@@ -430,12 +485,14 @@ function FilaHistoria({
   h,
   responsable,
   criterios,
+  onCambiarEstado,
   onEditar,
   onEliminar,
 }: {
   h: Historia;
   responsable?: Miembro | undefined;
   criterios: { estado: string }[];
+  onCambiarEstado: (estado: string) => void;
   onEditar: () => void;
   onEliminar: () => void;
 }) {
@@ -459,6 +516,21 @@ function FilaHistoria({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Select value={h.estado} onValueChange={onCambiarEstado}>
+            <SelectTrigger
+              className="h-8 w-48 text-xs"
+              aria-label={`Estado de ${h.codigo || h.titulo}`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ESTADOS_HISTORIA.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {e}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <StatusBadge value={h.prioridad} kind="prioridad" />
           <span
             className={cn(
@@ -554,25 +626,5 @@ function EquipoProyecto({ historias, miembros }: { historias: Historia[]; miembr
         </Link>
       </p>
     </div>
-  );
-}
-
-function Iniciales({ nombre, grande }: { nombre: string; grande?: boolean }) {
-  const ini = nombre
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-  return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary",
-        grande ? "size-9 text-sm" : "size-5 text-[10px]",
-      )}
-      aria-hidden="true"
-    >
-      {ini}
-    </span>
   );
 }
