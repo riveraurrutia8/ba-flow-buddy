@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -25,6 +25,7 @@ type FormState = {
   beneficio: string;
   prioridad: string;
   estado: string;
+  responsable_id: string;
 };
 
 const empty: FormState = {
@@ -35,6 +36,7 @@ const empty: FormState = {
   beneficio: "",
   prioridad: "Media",
   estado: "Borrador",
+  responsable_id: "",
 };
 
 export function HistoriaDialog({
@@ -51,6 +53,7 @@ export function HistoriaDialog({
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(empty);
   const [error, setError] = useState<string | null>(null);
+  const { data: miembros } = useQuery({ queryKey: ["miembros"], queryFn: api.listMiembros, enabled: open });
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +68,7 @@ export function HistoriaDialog({
             beneficio: historia.beneficio ?? "",
             prioridad: historia.prioridad,
             estado: historia.estado,
+            responsable_id: historia.responsable_id ?? "",
           }
         : empty,
     );
@@ -81,6 +85,7 @@ export function HistoriaDialog({
         beneficio: form.beneficio.trim() || null,
         prioridad: form.prioridad,
         estado: form.estado,
+        responsable_id: form.responsable_id || null,
       };
       return historia ? api.updateHistoria(historia.id, values) : api.createHistoria(values);
     },
@@ -191,6 +196,22 @@ export function HistoriaDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Responsable</Label>
+            <Select value={form.responsable_id || "none"} onValueChange={(v) => setForm({ ...form, responsable_id: v === "none" ? "" : v })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin asignar</SelectItem>
+                {(miembros ?? []).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.nombre}{m.rol ? ` — ${m.rol}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
