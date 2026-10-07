@@ -18,15 +18,22 @@ export const sugerirCriterios = createServerFn({ method: "POST" })
     try {
       return { criterios: await generarCriterios(data), error: null as string | null };
     } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
+      console.error("[sugerirCriterios]", e);
+      // Tras agotar los reintentos, el AI SDK envuelve el error original en `lastError`.
+      const err = e as { statusCode?: number; lastError?: { statusCode?: number } };
+      const status = err.statusCode ?? err.lastError?.statusCode;
       const msg =
         status === 429
           ? "Demasiadas solicitudes a la IA. Espera un momento e inténtalo de nuevo."
-          : status === 402
-            ? "Se agotaron los créditos de IA del espacio de trabajo."
-            : e instanceof Error
-              ? e.message
-              : "Error desconocido";
-      return { criterios: [] as string[], error: `No se pudieron generar sugerencias: ${msg}` };
+          : status === 400 || status === 403
+            ? "La API key de Google Gemini no es válida o no tiene permisos."
+            : status !== undefined && status >= 500
+              ? "El servicio de Google Gemini está saturado en este momento. Inténtalo de nuevo en unos minutos."
+              : e instanceof Error && /abort|timeout/i.test(e.name)
+                ? "La IA tardó demasiado en responder. Inténtalo de nuevo."
+                : e instanceof Error
+                  ? e.message
+                  : "Error desconocido";
+      return { criterios: [] as string[], error: msg };
     }
   });
