@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { EmptyState, PageHeader } from "@/components/AppShell";
+import { EmptyState, Migas, PageHeader } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -46,6 +46,12 @@ function HistoriaDetalle() {
   const [toDelete, setToDelete] = useState<Criterio | null>(null);
 
   const historia = useQuery({ queryKey: ["historia", id], queryFn: () => api.getHistoria(id) });
+  const proyectoId = historia.data?.proyecto_id ?? "";
+  const proyecto = useQuery({
+    queryKey: ["proyectos", proyectoId],
+    queryFn: () => api.getProyecto(proyectoId),
+    enabled: !!proyectoId,
+  });
   const criterios = useQuery({ queryKey: ["criterios", id], queryFn: () => api.listCriterios(id) });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["criterios", id] });
@@ -99,13 +105,18 @@ function HistoriaDetalle() {
 
   return (
     <div>
-      <Link
-        to="/proyectos/$id"
-        params={{ id: h.proyecto_id }}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Volver al proyecto
-      </Link>
+      <Migas
+        items={[
+          { label: "Portafolio", to: "/" },
+          {
+            label: proyecto.data?.nombre ?? "Proyecto",
+            to: "/proyectos/$id",
+            params: { id: h.proyecto_id },
+            search: { tab: "backlog" },
+          },
+          { label: h.codigo || h.titulo },
+        ]}
+      />
 
       <PageHeader
         title={h.titulo}

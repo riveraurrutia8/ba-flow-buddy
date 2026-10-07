@@ -60,7 +60,11 @@ export const api = {
   },
   async createProyecto(values: Partial<Proyecto>) {
     return unwrap<Proyecto>(
-      await supabase.from("proyectos").insert(values as never).select().single(),
+      await supabase
+        .from("proyectos")
+        .insert(values as never)
+        .select()
+        .single(),
     );
   },
   async updateProyecto(id: string, values: Partial<Proyecto>) {
@@ -121,6 +125,15 @@ export const api = {
         .order("created_at", { ascending: true }),
     );
   },
+  async listCriteriosDeHistorias(historiaIds: string[]) {
+    if (historiaIds.length === 0) return [];
+    return unwrap<Criterio[]>(
+      await supabase
+        .from("criterios_aceptacion")
+        .select("*")
+        .in("historia_usuario_id", historiaIds),
+    );
+  },
   async createCriterio(values: Partial<Criterio>) {
     return unwrap<Criterio>(
       await supabase
@@ -152,12 +165,21 @@ export const api = {
   },
   async createMiembro(values: Partial<Miembro>) {
     return unwrap<Miembro>(
-      await supabase.from("miembros_equipo").insert(values as never).select().single(),
+      await supabase
+        .from("miembros_equipo")
+        .insert(values as never)
+        .select()
+        .single(),
     );
   },
   async updateMiembro(id: string, values: Partial<Miembro>) {
     return unwrap<Miembro>(
-      await supabase.from("miembros_equipo").update(values as never).eq("id", id).select().single(),
+      await supabase
+        .from("miembros_equipo")
+        .update(values as never)
+        .eq("id", id)
+        .select()
+        .single(),
     );
   },
   async deleteMiembro(id: string) {

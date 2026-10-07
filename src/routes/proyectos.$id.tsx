@@ -1,39 +1,66 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { EmptyState, PageHeader } from "@/components/AppShell";
+import { EmptyState, Migas } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
 import { ProyectoDialog } from "@/components/ProyectoDialog";
+import { BarraAvance, BarraEstados, LeyendaEstados } from "@/components/ProyectoMetricas";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, formatFecha, type Historia } from "@/lib/baflow";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  api,
+  ESTADOS_HISTORIA,
+  formatFecha,
+  PRIORIDADES,
+  type Historia,
+  type Miembro,
+} from "@/lib/baflow";
+import { diasRestantes, resumenProyecto, TONO_ESTADO } from "@/lib/metricas";
+import { cn } from "@/lib/utils";
+
+const PESTANAS = ["resumen", "backlog", "equipo"] as const;
+type Pestana = (typeof PESTANAS)[number];
 
 export const Route = createFileRoute("/proyectos/$id")({
+  validateSearch: (search: Record<string, unknown>): { tab?: Pestana | undefined } => ({
+    tab: PESTANAS.find((t) => t === search["tab"]),
+  }),
   head: () => ({
     meta: [
-      { title: "Detalle de proyecto — BA Flow" },
+      { title: "Espacio de proyecto — BA Flow" },
       {
         name: "description",
-        content: "Información del proyecto e historias de usuario asociadas.",
+        content: "Resumen, backlog y equipo de un proyecto en BA Flow.",
       },
-      { property: "og:title", content: "Detalle de proyecto — BA Flow" },
+      { property: "og:title", content: "Espacio de proyecto — BA Flow" },
       {
         property: "og:description",
-        content: "Información del proyecto e historias de usuario asociadas.",
+        content: "Resumen, backlog y equipo de un proyecto en BA Flow.",
       },
     ],
   }),
-  component: ProyectoDetalle,
+  component: EspacioProyecto,
 });
 
-function ProyectoDetalle() {
+function EspacioProyecto() {
   const { id } = Route.useParams();
+  const { tab = "resumen" } = Route.useSearch();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -48,11 +75,19 @@ function ProyectoDetalle() {
     queryKey: ["historias", id],
     queryFn: () => api.listHistorias(id),
   });
+  const ids = (historias.data ?? []).map((h) => h.id);
+  const criterios = useQuery({
+    queryKey: ["criterios", "lote", ids.join(",")],
+    queryFn: () => api.listCriteriosDeHistorias(ids),
+    enabled: historias.isSuccess,
+  });
+  const miembros = useQuery({ queryKey: ["miembros"], queryFn: api.listMiembros });
 
   const delHistoria = useMutation({
     mutationFn: (hid: string) => api.deleteHistoria(hid),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["historias"] });
+      qc.invalidateQueries({ queryKey: ["criterios"] });
       toast.success("Historia eliminada correctamente.");
       setHistoriaToDelete(null);
     },
@@ -63,8 +98,8 @@ function ProyectoDetalle() {
     mutationFn: () => api.deleteProyecto(id),
     onSuccess: async () => {
       toast.success("Proyecto eliminado correctamente.");
-      // Salir del detalle antes de invalidar, para no volver a pedir el proyecto eliminado.
-      await navigate({ to: "/proyectos" });
+      // Salir del espacio antes de invalidar, para no volver a pedir el proyecto eliminado.
+      await navigate({ to: "/" });
       qc.removeQueries({ queryKey: ["proyectos", id] });
       qc.invalidateQueries({ queryKey: ["proyectos"] });
       qc.invalidateQueries({ queryKey: ["historias"] });
@@ -75,8 +110,9 @@ function ProyectoDetalle() {
   if (proyecto.isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
@@ -85,8 +121,8 @@ function ProyectoDetalle() {
     return (
       <div>
         <p className="text-sm text-destructive">No se pudo cargar el proyecto solicitado.</p>
-        <Link to="/proyectos" className="mt-3 inline-block text-sm text-primary">
-          Volver a proyectos
+        <Link to="/" className="mt-3 inline-block text-sm text-primary">
+          Volver al portafolio
         </Link>
       </div>
     );
@@ -94,119 +130,153 @@ function ProyectoDetalle() {
 
   const p = proyecto.data;
   const items = historias.data ?? [];
+  const r = resumenProyecto(items, criterios.data ?? []);
+  const porId = new Map((miembros.data ?? []).map((m) => [m.id, m]));
+  const dias = diasRestantes(p.fecha_objetivo);
+  const cargandoBacklog = historias.isLoading || criterios.isLoading;
+
+  const nuevaHistoria = () => {
+    setEditingHistoria(null);
+    setHistoriaDialog(true);
+  };
 
   return (
     <div>
-      <Link
-        to="/proyectos"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Proyectos
-      </Link>
+      <Migas items={[{ label: "Portafolio", to: "/" }, { label: p.nombre }]} />
 
-      <PageHeader
-        title={p.nombre}
-        description={p.descripcion ?? "Sin descripción."}
-        action={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setEditProyecto(true)}>
-              <Pencil className="size-4" /> Editar
-            </Button>
-            <Button variant="outline" onClick={() => setConfirmProyecto(true)}>
-              <Trash2 className="size-4 text-destructive" /> Eliminar
-            </Button>
+      <Card className="mb-6 shadow-xs">
+        <CardContent className="space-y-5 pt-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                  {p.nombre}
+                </h1>
+                <StatusBadge value={p.estado} kind="proyecto" />
+              </div>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                {p.descripcion || "Sin descripción."}
+              </p>
+              <p className="mt-2 inline-flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <CalendarDays className="size-3.5" />
+                Inicio {formatFecha(p.fecha_inicio)} · Objetivo {formatFecha(p.fecha_objetivo)}
+                {dias !== null && p.estado !== "Finalizado" && (
+                  <span className={cn(dias < 0 && "font-medium text-danger")}>
+                    ({dias < 0 ? `vencido hace ${-dias} días` : `faltan ${dias} días`})
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setEditProyecto(true)}>
+                <Pencil className="size-4" /> Editar
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmProyecto(true)}>
+                <Trash2 className="size-4 text-destructive" /> Eliminar
+              </Button>
+            </div>
           </div>
-        }
-      />
-
-      <Card>
-        <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">
-          <Info label="Estado">
-            <StatusBadge value={p.estado} kind="proyecto" />
-          </Info>
-          <Info label="Fecha de inicio">{formatFecha(p.fecha_inicio)}</Info>
-          <Info label="Fecha objetivo">{formatFecha(p.fecha_objetivo)}</Info>
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              Avance: {r.finalizadas} de {r.total} historias finalizadas
+            </p>
+            <BarraAvance avance={r.avance} />
+          </div>
         </CardContent>
       </Card>
 
-      <div className="mt-8 mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Historias de usuario ({items.length})
-        </h2>
-        <Button
-          onClick={() => {
-            setEditingHistoria(null);
-            setHistoriaDialog(true);
-          }}
-        >
-          <Plus className="size-4" /> Nueva historia
-        </Button>
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          navigate({
+            to: "/proyectos/$id",
+            params: { id },
+            search: { tab: v as Pestana },
+            replace: true,
+          })
+        }
+      >
+        <TabsList>
+          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="backlog">Backlog ({r.total})</TabsTrigger>
+          <TabsTrigger value="equipo">Equipo</TabsTrigger>
+        </TabsList>
 
-      {historias.isLoading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : historias.isError ? (
-        <p className="text-sm text-destructive">Ocurrió un error al cargar las historias.</p>
-      ) : items.length === 0 ? (
-        <EmptyState
-          title="Este proyecto no tiene historias de usuario"
-          description="Agrega la primera historia para documentar el alcance funcional."
-        />
-      ) : (
-        <div className="grid gap-3">
-          {items.map((h) => (
-            <Card key={h.id}>
-              <CardContent className="flex flex-wrap items-start justify-between gap-4 pt-6">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {h.codigo && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-                        {h.codigo}
-                      </span>
-                    )}
-                    <Link
-                      to="/historias/$id"
-                      params={{ id: h.id }}
-                      className="font-medium text-foreground hover:text-primary"
-                    >
-                      {h.titulo}
-                    </Link>
+        <TabsContent value="resumen" className="mt-4">
+          {cargandoBacklog ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <Resumen
+              r={r}
+              onVerBacklog={() =>
+                navigate({ to: "/proyectos/$id", params: { id }, search: { tab: "backlog" } })
+              }
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="backlog" className="mt-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Historias agrupadas por estado, de la idea a la entrega.
+            </p>
+            <Button onClick={nuevaHistoria}>
+              <Plus className="size-4" /> Nueva historia
+            </Button>
+          </div>
+          {cargandoBacklog ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : historias.isError ? (
+            <p className="text-sm text-destructive">Ocurrió un error al cargar las historias.</p>
+          ) : items.length === 0 ? (
+            <EmptyState
+              title="Este proyecto no tiene historias de usuario"
+              description="Agrega la primera historia para documentar el alcance funcional."
+              action={
+                <Button onClick={nuevaHistoria}>
+                  <Plus className="size-4" /> Nueva historia
+                </Button>
+              }
+            />
+          ) : (
+            <div className="space-y-6">
+              {ESTADOS_HISTORIA.filter((e) => r.porEstado[e] > 0).map((estado) => (
+                <section key={estado}>
+                  <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <span className={cn("size-2 rounded-full", TONO_ESTADO[estado])} />
+                    {estado}
+                    <span className="font-normal text-muted-foreground">{r.porEstado[estado]}</span>
+                  </h2>
+                  <div className="grid gap-2">
+                    {items
+                      .filter((h) => h.estado === estado)
+                      .map((h) => (
+                        <FilaHistoria
+                          key={h.id}
+                          h={h}
+                          responsable={h.responsable_id ? porId.get(h.responsable_id) : undefined}
+                          criterios={r.criteriosPorHistoria.get(h.id) ?? []}
+                          onEditar={() => {
+                            setEditingHistoria(h);
+                            setHistoriaDialog(true);
+                          }}
+                          onEliminar={() => setHistoriaToDelete(h)}
+                        />
+                      ))}
                   </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    Como {h.rol || "—"}, quiero {h.necesidad || "—"}, para {h.beneficio || "—"}.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge value={h.prioridad} kind="prioridad" />
-                  <StatusBadge value={h.estado} kind="historia" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Editar historia"
-                    onClick={() => {
-                      setEditingHistoria(h);
-                      setHistoriaDialog(true);
-                    }}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Eliminar historia"
-                    onClick={() => setHistoriaToDelete(h)}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                </section>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="equipo" className="mt-4">
+          <EquipoProyecto historias={items} miembros={miembros.data ?? []} />
+        </TabsContent>
+      </Tabs>
 
       <ProyectoDialog open={editProyecto} onOpenChange={setEditProyecto} proyecto={p} />
       <HistoriaDialog
@@ -235,11 +305,274 @@ function ProyectoDetalle() {
   );
 }
 
-function Info({ label, children }: { label: string; children: React.ReactNode }) {
+function Resumen({
+  r,
+  onVerBacklog,
+}: {
+  r: ReturnType<typeof resumenProyecto>;
+  onVerBacklog: () => void;
+}) {
+  const kpis = [
+    { label: "Historias", value: r.total },
+    { label: "En curso", value: r.enCurso },
+    { label: "Finalizadas", value: r.finalizadas },
+    { label: "Criterios cumplidos", value: `${r.criteriosCumplidos}/${r.criteriosTotal}` },
+  ];
+
   return (
-    <div>
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
-      <div className="mt-1 text-sm text-foreground">{children}</div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {kpis.map((k) => (
+          <Card key={k.label} className="shadow-xs">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-muted-foreground">{k.label}</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{k.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Card className="shadow-xs">
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="size-4 text-warning" />
+              Requiere atención ({r.alertas.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {r.alertas.length === 0 ? (
+              <p className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
+                <CheckCircle2 className="size-4 text-success" />
+                Todo en orden: cada historia activa tiene criterios y responsable.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {r.alertas.map(({ historia, motivo }) => (
+                  <li key={historia.id}>
+                    <Link
+                      to="/historias/$id"
+                      params={{ id: historia.id }}
+                      className="group flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+                          {historia.codigo && (
+                            <span className="mr-1.5 font-mono text-xs text-muted-foreground">
+                              {historia.codigo}
+                            </span>
+                          )}
+                          {historia.titulo}
+                        </p>
+                        <p className="mt-0.5 text-xs text-warning">{motivo}</p>
+                      </div>
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-xs">
+          <CardHeader className="border-b border-border pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-base">Backlog por estado</CardTitle>
+              <Button variant="link" className="h-auto p-0 text-sm" onClick={onVerBacklog}>
+                Ver backlog
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-5">
+            {r.total === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no hay historias en este proyecto.
+              </p>
+            ) : (
+              <>
+                <BarraEstados porEstado={r.porEstado} total={r.total} className="h-3" />
+                <LeyendaEstados porEstado={r.porEstado} />
+              </>
+            )}
+            <div className="border-t border-border pt-4">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Por prioridad</p>
+              <div className="flex flex-wrap gap-2">
+                {[...PRIORIDADES].reverse().map((pr) => (
+                  <PrioridadConteo key={pr} prioridad={pr} r={r} />
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function PrioridadConteo({
+  prioridad,
+  r,
+}: {
+  prioridad: string;
+  r: ReturnType<typeof resumenProyecto>;
+}) {
+  const n = r.porPrioridad[prioridad] ?? 0;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <StatusBadge value={prioridad} kind="prioridad" />
+      <span className="text-sm font-semibold tabular-nums text-foreground">{n}</span>
+    </span>
+  );
+}
+
+function FilaHistoria({
+  h,
+  responsable,
+  criterios,
+  onEditar,
+  onEliminar,
+}: {
+  h: Historia;
+  responsable?: Miembro | undefined;
+  criterios: { estado: string }[];
+  onEditar: () => void;
+  onEliminar: () => void;
+}) {
+  const cumplidos = criterios.filter((c) => c.estado === "Cumplido").length;
+  return (
+    <Card className="shadow-xs">
+      <CardContent className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 p-4">
+        <div className="min-w-0 flex-1 basis-64">
+          <Link
+            to="/historias/$id"
+            params={{ id: h.id }}
+            className="text-sm font-medium text-foreground hover:text-primary"
+          >
+            {h.codigo && (
+              <span className="mr-1.5 font-mono text-xs text-muted-foreground">{h.codigo}</span>
+            )}
+            {h.titulo}
+          </Link>
+          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+            Como {h.rol || "—"}, quiero {h.necesidad || "—"}, para {h.beneficio || "—"}.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge value={h.prioridad} kind="prioridad" />
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-xs tabular-nums",
+              criterios.length === 0 ? "font-medium text-warning" : "text-muted-foreground",
+            )}
+            title="Criterios de aceptación cumplidos"
+          >
+            <ListChecks className="size-3.5" />
+            {criterios.length === 0 ? "Sin criterios" : `${cumplidos}/${criterios.length}`}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            {responsable ? (
+              <>
+                <Iniciales nombre={responsable.nombre} />
+                {responsable.nombre}
+              </>
+            ) : (
+              "Sin responsable"
+            )}
+          </span>
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" aria-label="Editar historia" onClick={onEditar}>
+              <Pencil className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="Eliminar historia" onClick={onEliminar}>
+              <Trash2 className="size-4 text-destructive" />
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EquipoProyecto({ historias, miembros }: { historias: Historia[]; miembros: Miembro[] }) {
+  const asignados = miembros
+    .map((m) => ({ m, hus: historias.filter((h) => h.responsable_id === m.id) }))
+    .filter((x) => x.hus.length > 0);
+  const sinAsignar = historias.filter((h) => !h.responsable_id).length;
+
+  if (asignados.length === 0) {
+    return (
+      <EmptyState
+        title="Nadie tiene historias asignadas en este proyecto"
+        description="Asigna un responsable al editar una historia del backlog."
+        action={
+          <Button variant="outline" asChild>
+            <Link to="/equipo">Gestionar equipo</Link>
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        {asignados.map(({ m, hus }) => (
+          <Card key={m.id} className="shadow-xs">
+            <CardContent className="flex items-start gap-3 p-4">
+              <Iniciales nombre={m.nombre} grande />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">{m.nombre}</p>
+                <p className="text-xs text-muted-foreground">{m.rol || "Sin rol"}</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {hus.map((h) => (
+                    <Link
+                      key={h.id}
+                      to="/historias/$id"
+                      params={{ id: h.id }}
+                      className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground hover:text-primary"
+                      title={h.titulo}
+                    >
+                      {h.codigo || h.titulo}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {hus.length} HU
+              </span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {sinAsignar > 0
+          ? `${sinAsignar} ${sinAsignar === 1 ? "historia sin responsable" : "historias sin responsable"}. `
+          : ""}
+        <Link to="/equipo" className="text-primary hover:underline">
+          Gestionar equipo
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+function Iniciales({ nombre, grande }: { nombre: string; grande?: boolean }) {
+  const ini = nombre
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary",
+        grande ? "size-9 text-sm" : "size-5 text-[10px]",
+      )}
+      aria-hidden="true"
+    >
+      {ini}
+    </span>
   );
 }
