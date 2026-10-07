@@ -56,6 +56,7 @@ export type Database = {
           necesidad: string | null
           prioridad: string
           proyecto_id: string
+          responsable_id: string | null
           rol: string | null
           titulo: string
         }
@@ -68,6 +69,7 @@ export type Database = {
           necesidad?: string | null
           prioridad?: string
           proyecto_id: string
+          responsable_id?: string | null
           rol?: string | null
           titulo: string
         }
@@ -80,6 +82,7 @@ export type Database = {
           necesidad?: string | null
           prioridad?: string
           proyecto_id?: string
+          responsable_id?: string | null
           rol?: string | null
           titulo?: string
         }
@@ -91,7 +94,38 @@ export type Database = {
             referencedRelation: "proyectos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "historias_usuario_responsable_id_fkey"
+            columns: ["responsable_id"]
+            isOneToOne: false
+            referencedRelation: "miembros_equipo"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      miembros_equipo: {
+        Row: {
+          correo: string
+          created_at: string
+          id: string
+          nombre: string
+          rol: string | null
+        }
+        Insert: {
+          correo: string
+          created_at?: string
+          id?: string
+          nombre: string
+          rol?: string | null
+        }
+        Update: {
+          correo?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          rol?: string | null
+        }
+        Relationships: []
       }
       proyectos: {
         Row: {

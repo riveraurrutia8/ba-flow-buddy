@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EquipoRouteImport } from './routes/equipo'
 import { Route as HistoriasIdRouteImport } from './routes/historias.$id'
 import { Route as ProyectosIndexRouteImport } from './routes/proyectos.index'
 import { Route as ProyectosIdRouteImport } from './routes/proyectos.$id'
@@ -17,6 +18,11 @@ import { Route as ProyectosIdRouteImport } from './routes/proyectos.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EquipoRoute = EquipoRouteImport.update({
+  id: '/equipo',
+  path: '/equipo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoriasIdRoute = HistoriasIdRouteImport.update({
@@ -37,12 +43,14 @@ const ProyectosIdRoute = ProyectosIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/equipo': typeof EquipoRoute
   '/historias/$id': typeof HistoriasIdRoute
   '/proyectos/$id': typeof ProyectosIdRoute
   '/proyectos/': typeof ProyectosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/equipo': typeof EquipoRoute
   '/historias/$id': typeof HistoriasIdRoute
   '/proyectos/$id': typeof ProyectosIdRoute
   '/proyectos': typeof ProyectosIndexRoute
@@ -50,20 +58,29 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/equipo': typeof EquipoRoute
   '/historias/$id': typeof HistoriasIdRoute
   '/proyectos/$id': typeof ProyectosIdRoute
   '/proyectos/': typeof ProyectosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/historias/$id' | '/proyectos/$id' | '/proyectos/'
+  fullPaths:
+    '/' | '/equipo' | '/historias/$id' | '/proyectos/$id' | '/proyectos/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/historias/$id' | '/proyectos/$id' | '/proyectos'
-  id: '__root__' | '/' | '/historias/$id' | '/proyectos/$id' | '/proyectos/'
+  to: '/' | '/equipo' | '/historias/$id' | '/proyectos/$id' | '/proyectos'
+  id:
+    | '__root__'
+    | '/'
+    | '/equipo'
+    | '/historias/$id'
+    | '/proyectos/$id'
+    | '/proyectos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EquipoRoute: typeof EquipoRoute
   HistoriasIdRoute: typeof HistoriasIdRoute
   ProyectosIdRoute: typeof ProyectosIdRoute
   ProyectosIndexRoute: typeof ProyectosIndexRoute
@@ -76,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/equipo': {
+      id: '/equipo'
+      path: '/equipo'
+      fullPath: '/equipo'
+      preLoaderRoute: typeof EquipoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/historias/$id': {
@@ -104,6 +128,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EquipoRoute: EquipoRoute,
   HistoriasIdRoute: HistoriasIdRoute,
   ProyectosIdRoute: ProyectosIdRoute,
   ProyectosIndexRoute: ProyectosIndexRoute,

@@ -32,6 +32,7 @@ export type Historia = {
   beneficio: string | null;
   prioridad: string;
   estado: string;
+  responsable_id: string | null;
   created_at: string;
 };
 
@@ -143,6 +144,34 @@ export const api = {
     const { error } = await supabase.from("criterios_aceptacion").delete().eq("id", id);
     if (error) throw new Error(error.message);
   },
+
+  async listMiembros() {
+    return unwrap<Miembro[]>(
+      await supabase.from("miembros_equipo").select("*").order("nombre", { ascending: true }),
+    );
+  },
+  async createMiembro(values: Partial<Miembro>) {
+    return unwrap<Miembro>(
+      await supabase.from("miembros_equipo").insert(values as never).select().single(),
+    );
+  },
+  async updateMiembro(id: string, values: Partial<Miembro>) {
+    return unwrap<Miembro>(
+      await supabase.from("miembros_equipo").update(values as never).eq("id", id).select().single(),
+    );
+  },
+  async deleteMiembro(id: string) {
+    const { error } = await supabase.from("miembros_equipo").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+  },
+};
+
+export type Miembro = {
+  id: string;
+  nombre: string;
+  correo: string;
+  rol: string | null;
+  created_at: string;
 };
 
 export function formatFecha(value: string | null) {

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { LayoutDashboard, FolderKanban, Workflow, Menu } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Workflow, Menu, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/proyectos", label: "Proyectos", icon: FolderKanban },
+  { to: "/equipo", label: "Equipo", icon: Users },
 ] as const;
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
