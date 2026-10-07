@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ESTADOS_PROYECTO, type Proyecto } from "@/lib/baflow";
 
@@ -37,10 +43,12 @@ export function ProyectoDialog({
   open,
   onOpenChange,
   proyecto,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   proyecto?: Proyecto | null;
+  onCreated?: (p: Proyecto) => void;
 }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(empty);
@@ -73,9 +81,12 @@ export function ProyectoDialog({
       };
       return proyecto ? api.updateProyecto(proyecto.id, values) : api.createProyecto(values);
     },
-    onSuccess: () => {
+    onSuccess: (guardado) => {
       qc.invalidateQueries({ queryKey: ["proyectos"] });
-      toast.success(proyecto ? "Proyecto actualizado correctamente." : "Proyecto creado correctamente.");
+      if (!proyecto) onCreated?.(guardado);
+      toast.success(
+        proyecto ? "Proyecto actualizado correctamente." : "Proyecto creado correctamente.",
+      );
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(`No se pudo guardar el proyecto: ${e.message}`),

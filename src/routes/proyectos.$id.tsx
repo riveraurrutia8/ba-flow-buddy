@@ -10,6 +10,7 @@ import {
   ListChecks,
   Pencil,
   Plus,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 
 import { EmptyState, Migas } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
+import { GeneradorHistorias } from "@/components/GeneradorHistorias";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
 import { Iniciales } from "@/components/Iniciales";
 import { ProyectoDialog } from "@/components/ProyectoDialog";
@@ -50,8 +52,12 @@ const PESTANAS = ["resumen", "backlog", "equipo"] as const;
 type Pestana = (typeof PESTANAS)[number];
 
 export const Route = createFileRoute("/proyectos/$id")({
-  validateSearch: (search: Record<string, unknown>): { tab?: Pestana | undefined } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { tab?: Pestana | undefined; generar?: true | undefined } => ({
     tab: PESTANAS.find((t) => t === search["tab"]),
+    // ?generar=true llega desde "Nuevo proyecto": abre el generador de historias con IA.
+    generar: search["generar"] === true || search["generar"] === "true" ? true : undefined,
   }),
   head: () => ({
     meta: [
@@ -72,7 +78,7 @@ export const Route = createFileRoute("/proyectos/$id")({
 
 function EspacioProyecto() {
   const { id } = Route.useParams();
-  const { tab = "resumen" } = Route.useSearch();
+  const { tab = "resumen", generar } = Route.useSearch();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -82,6 +88,7 @@ function EspacioProyecto() {
   const [historiaToDelete, setHistoriaToDelete] = useState<Historia | null>(null);
   const [confirmProyecto, setConfirmProyecto] = useState(false);
   const [vista, setVista] = useState<"tablero" | "lista">("tablero");
+  const [generador, setGenerador] = useState(!!generar);
   const mover = useMoverHistoria(id);
 
   const proyecto = useQuery({ queryKey: ["proyectos", id], queryFn: () => api.getProyecto(id) });
@@ -152,6 +159,14 @@ function EspacioProyecto() {
   const editarHistoria = (h: Historia) => {
     setEditingHistoria(h);
     setHistoriaDialog(true);
+  };
+
+  const cerrarGenerador = () => {
+    setGenerador(false);
+    // Quita ?generar de la URL para que recargar no vuelva a generar.
+    if (generar) {
+      navigate({ to: "/proyectos/$id", params: { id }, search: { tab: "backlog" }, replace: true });
+    }
   };
 
   const nuevaHistoria = () => {
@@ -267,11 +282,24 @@ function EspacioProyecto() {
                   </button>
                 ))}
               </div>
+              {!generador && (
+                <Button variant="outline" onClick={() => setGenerador(true)}>
+                  <Sparkles className="size-4" /> Generar con IA
+                </Button>
+              )}
               <Button onClick={nuevaHistoria}>
                 <Plus className="size-4" /> Nueva historia
               </Button>
             </div>
           </div>
+          {generador && !cargandoBacklog && (
+            <GeneradorHistorias
+              proyecto={p}
+              existentes={items}
+              generarAlAbrir={!!generar}
+              onCerrar={cerrarGenerador}
+            />
+          )}
           {cargandoBacklog ? (
             <div className="space-y-3">
               <Skeleton className="h-20 w-full" />
@@ -280,15 +308,22 @@ function EspacioProyecto() {
           ) : historias.isError ? (
             <p className="text-sm text-destructive">Ocurrió un error al cargar las historias.</p>
           ) : items.length === 0 ? (
-            <EmptyState
-              title="Este proyecto no tiene historias de usuario"
-              description="Agrega la primera historia para documentar el alcance funcional."
-              action={
-                <Button onClick={nuevaHistoria}>
-                  <Plus className="size-4" /> Nueva historia
-                </Button>
-              }
-            />
+            !generador && (
+              <EmptyState
+                title="Este proyecto no tiene historias de usuario"
+                description="Genera un primer backlog con IA a partir de la descripción del proyecto, o crea la primera historia a mano."
+                action={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => setGenerador(true)}>
+                      <Sparkles className="size-4" /> Generar historias con IA
+                    </Button>
+                    <Button variant="outline" onClick={nuevaHistoria}>
+                      <Plus className="size-4" /> Nueva historia
+                    </Button>
+                  </div>
+                }
+              />
+            )
           ) : vista === "tablero" ? (
             <TableroBacklog
               proyectoId={id}

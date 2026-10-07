@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/")({
 
 function Portafolio() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const navigate = useNavigate();
   const proyectos = useQuery({ queryKey: ["proyectos"], queryFn: api.listProyectos });
   const historias = useQuery({ queryKey: ["historias"], queryFn: () => api.listHistorias() });
   const ids = (historias.data ?? []).map((h) => h.id);
@@ -111,7 +112,17 @@ function Portafolio() {
         </>
       )}
 
-      <ProyectoDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <ProyectoDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={(p) =>
+          navigate({
+            to: "/proyectos/$id",
+            params: { id: p.id },
+            search: { tab: "backlog", generar: true },
+          })
+        }
+      />
     </div>
   );
 }
