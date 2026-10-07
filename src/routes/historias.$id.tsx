@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
 import { StatusBadge } from "@/components/StatusBadge";
+import { SugerenciasIA } from "@/components/SugerenciasIA";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -128,6 +129,8 @@ function HistoriaDetalle() {
       <h2 className="mt-8 mb-3 text-lg font-semibold tracking-tight text-foreground">
         Criterios de aceptación ({items.length})
       </h2>
+
+      <SugerenciasIA historia={h} />
 
       <Card className="mb-4">
         <CardContent className="pt-6">
