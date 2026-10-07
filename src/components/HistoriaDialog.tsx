@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,9 +14,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ESTADOS_HISTORIA, PRIORIDADES, type Historia } from "@/lib/baflow";
+import { notificarCambioEstado } from "@/lib/notificaciones.functions";
 
 type FormState = {
   codigo: string;
@@ -53,7 +61,44 @@ export function HistoriaDialog({
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(empty);
   const [error, setError] = useState<string | null>(null);
-  const { data: miembros } = useQuery({ queryKey: ["miembros"], queryFn: api.listMiembros, enabled: open });
+  const { data: miembros } = useQuery({
+    queryKey: ["miembros"],
+    queryFn: api.listMiembros,
+    enabled: open,
+  });
+  const notificar = useServerFn(notificarCambioEstado);
+
+  async function avisarCambioEstado(guardada: Historia, estadoAnterior: string) {
+    const proyecto = await qc
+      .fetchQuery({
+        queryKey: ["proyectos", proyectoId],
+        queryFn: () => api.getProyecto(proyectoId),
+      })
+      .catch(() => null);
+    const criterios = await qc
+      .fetchQuery({
+        queryKey: ["criterios", guardada.id],
+        queryFn: () => api.listCriterios(guardada.id),
+      })
+      .catch(() => []);
+    await notificar({
+      data: {
+        historia_id: guardada.id,
+        codigo: guardada.codigo,
+        titulo: guardada.titulo,
+        rol: guardada.rol,
+        necesidad: guardada.necesidad,
+        beneficio: guardada.beneficio,
+        criterios: criterios.map((c) => ({ descripcion: c.descripcion, estado: c.estado })),
+        proyecto: proyecto?.nombre ?? null,
+        prioridad: guardada.prioridad,
+        responsable: miembros?.find((m) => m.id === guardada.responsable_id)?.nombre ?? null,
+        estado_anterior: estadoAnterior,
+        estado_nuevo: guardada.estado,
+        url: `${window.location.origin}/historias/${guardada.id}`,
+      },
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -89,10 +134,16 @@ export function HistoriaDialog({
       };
       return historia ? api.updateHistoria(historia.id, values) : api.createHistoria(values);
     },
-    onSuccess: () => {
+    onSuccess: (guardada) => {
+      if (historia && guardada.estado !== historia.estado) {
+        // En segundo plano: un fallo de la notificación no afecta el guardado.
+        avisarCambioEstado(guardada, historia.estado).catch(() => {});
+      }
       qc.invalidateQueries({ queryKey: ["historias"] });
       if (historia) qc.invalidateQueries({ queryKey: ["historia", historia.id] });
-      toast.success(historia ? "Historia actualizada correctamente." : "Historia creada correctamente.");
+      toast.success(
+        historia ? "Historia actualizada correctamente." : "Historia creada correctamente.",
+      );
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(`No se pudo guardar la historia: ${e.message}`),
@@ -112,7 +163,9 @@ export function HistoriaDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{historia ? "Editar historia de usuario" : "Nueva historia de usuario"}</DialogTitle>
+          <DialogTitle>
+            {historia ? "Editar historia de usuario" : "Nueva historia de usuario"}
+          </DialogTitle>
           <DialogDescription>Como [rol], quiero [necesidad], para [beneficio].</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
@@ -168,7 +221,10 @@ export function HistoriaDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Prioridad</Label>
-              <Select value={form.prioridad} onValueChange={(v) => setForm({ ...form, prioridad: v })}>
+              <Select
+                value={form.prioridad}
+                onValueChange={(v) => setForm({ ...form, prioridad: v })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -199,7 +255,10 @@ export function HistoriaDialog({
           </div>
           <div className="space-y-2">
             <Label>Responsable</Label>
-            <Select value={form.responsable_id || "none"} onValueChange={(v) => setForm({ ...form, responsable_id: v === "none" ? "" : v })}>
+            <Select
+              value={form.responsable_id || "none"}
+              onValueChange={(v) => setForm({ ...form, responsable_id: v === "none" ? "" : v })}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -207,7 +266,8 @@ export function HistoriaDialog({
                 <SelectItem value="none">Sin asignar</SelectItem>
                 {(miembros ?? []).map((m) => (
                   <SelectItem key={m.id} value={m.id}>
-                    {m.nombre}{m.rol ? ` — ${m.rol}` : ""}
+                    {m.nombre}
+                    {m.rol ? ` — ${m.rol}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
