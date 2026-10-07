@@ -1,7 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-// Avisa a n8n cuando una historia cambia de estado; n8n la analiza con IA y notifica por Telegram.
+export type AnalisisRiesgo = {
+  riesgo: string;
+  resumen: string;
+  observaciones: string[];
+};
+
+const respuestaN8nSchema = z.object({
+  analizado: z.boolean(),
+  riesgo: z.string().max(50).optional(),
+  resumen: z.string().max(2000).optional(),
+  observaciones: z.array(z.string().max(1000)).max(10).optional(),
+});
+
+// Avisa a n8n cuando una historia cambia de estado; n8n la analiza con IA, notifica por Telegram
+// y responde con el análisis para mostrarlo en la app.
 // Si N8N_WEBHOOK_URL no está configurada o n8n falla, no se interrumpe el guardado.
 export const notificarCambioEstado = createServerFn({ method: "POST" })
   .inputValidator((d) =>
@@ -25,9 +39,9 @@ export const notificarCambioEstado = createServerFn({ method: "POST" })
       })
       .parse(d),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ enviado: boolean; analisis: AnalisisRiesgo | null }> => {
     const webhookUrl = process.env["N8N_WEBHOOK_URL"];
-    if (!webhookUrl) return { enviado: false };
+    if (!webhookUrl) return { enviado: false, analisis: null };
 
     try {
       const res = await fetch(webhookUrl, {
@@ -38,12 +52,25 @@ export const notificarCambioEstado = createServerFn({ method: "POST" })
           fecha: new Date().toISOString(),
           ...data,
         }),
-        signal: AbortSignal.timeout(10_000),
+        // n8n espera el análisis de Gemini (con reintentos) antes de responder.
+        signal: AbortSignal.timeout(50_000),
       });
-      if (!res.ok) console.error("[notificarCambioEstado] n8n respondió", res.status);
-      return { enviado: res.ok };
+      if (!res.ok) {
+        console.error("[notificarCambioEstado] n8n respondió", res.status);
+        return { enviado: false, analisis: null };
+      }
+      const respuesta = respuestaN8nSchema.safeParse(await res.json().catch(() => null));
+      const analisis =
+        respuesta.success && respuesta.data.analizado && respuesta.data.riesgo
+          ? {
+              riesgo: respuesta.data.riesgo,
+              resumen: respuesta.data.resumen ?? "",
+              observaciones: respuesta.data.observaciones ?? [],
+            }
+          : null;
+      return { enviado: true, analisis };
     } catch (e) {
       console.error("[notificarCambioEstado]", e);
-      return { enviado: false };
+      return { enviado: false, analisis: null };
     }
   });

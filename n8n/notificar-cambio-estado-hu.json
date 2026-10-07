@@ -5,7 +5,8 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "baflow-estado-hu",
-        "options": {}
+        "options": {},
+        "responseMode": "responseNode"
       },
       "id": "ba100000-0000-4000-8000-000000000001",
       "name": "Webhook BA Flow",
@@ -61,7 +62,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({\n  systemInstruction: { parts: [{ text: \"Eres un Business Analyst senior. Evalúa si esta historia de usuario está lista para pasar a desarrollo/validación. Revisa: que el rol, la necesidad y el beneficio estén claros; que existan criterios de aceptación suficientes, verificables y sin ambigüedades; y si falta cubrir casos importantes. Riesgo Alto: sin criterios, o criterios insuficientes/ambiguos, o la historia está incompleta. Riesgo Medio: está bien en general pero hay vacíos relevantes. Riesgo Bajo: está lista. Responde en español latinoamericano, breve y directo. El resumen en una o dos frases; máximo 4 observaciones accionables.\" }] },\n  contents: [{ role: 'user', parts: [{ text:\n    'Historia: ' + ($json.body.codigo ? $json.body.codigo + ' - ' : '') + $json.body.titulo + '\\n' +\n    'Como ' + ($json.body.rol || '(sin rol)') + ', quiero ' + ($json.body.necesidad || '(sin necesidad)') + ', para ' + ($json.body.beneficio || '(sin beneficio)') + '.\\n' +\n    'Prioridad: ' + $json.body.prioridad + '\\n' +\n    'Cambio de estado: ' + $json.body.estado_anterior + ' -> ' + $json.body.estado_nuevo + '\\n' +\n    'Criterios de aceptación (' + ($json.body.criterios || []).length + '):\\n' +\n    (($json.body.criterios || []).map(c => '- [' + c.estado + '] ' + c.descripcion).join('\\n') || '(ninguno)')\n  }] }],\n  generationConfig: {\n    responseMimeType: 'application/json',\n    responseSchema: {\n      type: 'OBJECT',\n      properties: {\n        riesgo: { type: 'STRING', enum: ['Alto', 'Medio', 'Bajo'] },\n        resumen: { type: 'STRING' },\n        observaciones: { type: 'ARRAY', items: { type: 'STRING' } }\n      },\n      required: ['riesgo', 'resumen', 'observaciones']\n    }\n  }\n}) }}",
         "options": {
-          "timeout": 45000
+          "timeout": 20000
         }
       },
       "id": "ba300000-0000-4000-8000-000000000003",
@@ -74,8 +75,8 @@
       ],
       "onError": "continueRegularOutput",
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
@@ -119,7 +120,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        980,
+        1220,
         80
       ]
     },
@@ -136,7 +137,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1240,
+        1480,
         -20
       ]
     },
@@ -153,7 +154,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1240,
+        1480,
         180
       ]
     },
@@ -169,6 +170,36 @@
       "name": "Aviso de cambio de estado",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
+      "position": [
+        740,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ analizado: $json.riesgo !== 'Sin análisis', riesgo: $json.riesgo, resumen: $json.resumen, observaciones: $json.observaciones }) }}",
+        "options": {}
+      },
+      "id": "ba900000-0000-4000-8000-000000000009",
+      "name": "Responder análisis a la app",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ analizado: false }) }}",
+        "options": {}
+      },
+      "id": "ba000000-0000-4000-8000-000000000000",
+      "name": "Responder sin análisis",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
         500,
         340
@@ -198,7 +229,7 @@
         ],
         [
           {
-            "node": "Aviso de cambio de estado",
+            "node": "Responder sin análisis",
             "type": "main",
             "index": 0
           }
@@ -220,7 +251,7 @@
       "main": [
         [
           {
-            "node": "¿Riesgo alto?",
+            "node": "Responder análisis a la app",
             "type": "main",
             "index": 0
           }
@@ -239,6 +270,28 @@
         [
           {
             "node": "Aviso con análisis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder análisis a la app": {
+      "main": [
+        [
+          {
+            "node": "¿Riesgo alto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder sin análisis": {
+      "main": [
+        [
+          {
+            "node": "Aviso de cambio de estado",
             "type": "main",
             "index": 0
           }

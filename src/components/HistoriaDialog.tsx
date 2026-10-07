@@ -69,6 +69,27 @@ export function HistoriaDialog({
   const notificar = useServerFn(notificarCambioEstado);
 
   async function avisarCambioEstado(guardada: Historia, estadoAnterior: string) {
+    const aviso = toast.loading("Notificando el cambio de estado y analizando la historia…");
+    const res = await enviarCambioEstado(guardada, estadoAnterior).catch(() => null);
+    if (!res?.enviado) {
+      toast.dismiss(aviso);
+      return;
+    }
+    if (!res.analisis) {
+      toast.success("Equipo notificado por Telegram.", { id: aviso });
+      return;
+    }
+    const analisis = { ...res.analisis, estado: guardada.estado, fecha: new Date().toISOString() };
+    qc.setQueryData(["analisis", guardada.id], analisis);
+    const opciones = { id: aviso, description: analisis.resumen, duration: 10_000 };
+    if (analisis.riesgo === "Alto") {
+      toast.warning(`Riesgo ALTO detectado por la IA en "${guardada.titulo}"`, opciones);
+    } else {
+      toast.success(`Análisis de IA: riesgo ${analisis.riesgo}`, opciones);
+    }
+  }
+
+  async function enviarCambioEstado(guardada: Historia, estadoAnterior: string) {
     const proyecto = await qc
       .fetchQuery({
         queryKey: ["proyectos", proyectoId],
@@ -81,7 +102,7 @@ export function HistoriaDialog({
         queryFn: () => api.listCriterios(guardada.id),
       })
       .catch(() => []);
-    await notificar({
+    return notificar({
       data: {
         historia_id: guardada.id,
         codigo: guardada.codigo,
@@ -137,7 +158,7 @@ export function HistoriaDialog({
     onSuccess: (guardada) => {
       if (historia && guardada.estado !== historia.estado) {
         // En segundo plano: un fallo de la notificación no afecta el guardado.
-        avisarCambioEstado(guardada, historia.estado).catch(() => {});
+        void avisarCambioEstado(guardada, historia.estado);
       }
       qc.invalidateQueries({ queryKey: ["historias"] });
       if (historia) qc.invalidateQueries({ queryKey: ["historia", historia.id] });

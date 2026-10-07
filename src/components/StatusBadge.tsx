@@ -27,11 +27,18 @@ const criterio: Record<string, string> = {
   Cumplido: "bg-success-soft text-success border-success/25",
 };
 
+const riesgo: Record<string, string> = {
+  Alto: "bg-danger-soft text-danger border-danger/25",
+  Medio: "bg-warning-soft text-warning border-warning/25",
+  Bajo: "bg-success-soft text-success border-success/25",
+};
+
 const maps = {
   proyecto: estadoProyecto,
   historia: estadoHistoria,
   prioridad: prioridades,
   criterio,
+  riesgo,
 };
 
 export function StatusBadge({

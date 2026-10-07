@@ -8,6 +8,7 @@ import { EmptyState, PageHeader } from "@/components/AppShell";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { HistoriaDialog } from "@/components/HistoriaDialog";
 import { StatusBadge } from "@/components/StatusBadge";
+import { AnalisisRiesgo } from "@/components/AnalisisRiesgo";
 import { SugerenciasIA } from "@/components/SugerenciasIA";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +20,10 @@ export const Route = createFileRoute("/historias/$id")({
   head: () => ({
     meta: [
       { title: "Historia de usuario — BA Flow" },
-      { name: "description", content: "Detalle de la historia de usuario y sus criterios de aceptación." },
+      {
+        name: "description",
+        content: "Detalle de la historia de usuario y sus criterios de aceptación.",
+      },
       { property: "og:title", content: "Historia de usuario — BA Flow" },
       {
         property: "og:description",
@@ -57,7 +61,8 @@ function HistoriaDetalle() {
   });
 
   const actualizar = useMutation({
-    mutationFn: (v: { cid: string; values: Partial<Criterio> }) => api.updateCriterio(v.cid, v.values),
+    mutationFn: (v: { cid: string; values: Partial<Criterio> }) =>
+      api.updateCriterio(v.cid, v.values),
     onSuccess: () => {
       invalidate();
       setEditingId(null);
@@ -126,6 +131,8 @@ function HistoriaDetalle() {
         </CardContent>
       </Card>
 
+      <AnalisisRiesgo historiaId={h.id} />
+
       <h2 className="mt-8 mb-3 text-lg font-semibold tracking-tight text-foreground">
         Criterios de aceptación ({items.length})
       </h2>
@@ -189,7 +196,10 @@ function HistoriaDetalle() {
                           toast.error("La descripción del criterio es obligatoria.");
                           return;
                         }
-                        actualizar.mutate({ cid: c.id, values: { descripcion: editingText.trim() } });
+                        actualizar.mutate({
+                          cid: c.id,
+                          values: { descripcion: editingText.trim() },
+                        });
                       }}
                     >
                       <Check className="size-4" /> Guardar
