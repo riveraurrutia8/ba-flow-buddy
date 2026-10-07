@@ -74,3 +74,47 @@ export const notificarCambioEstado = createServerFn({ method: "POST" })
       return { enviado: false, analisis: null };
     }
   });
+
+// Avisa a n8n cuando la IA agrega historias al backlog de un proyecto; n8n lo notifica por Telegram.
+// Igual que arriba: si no hay webhook o n8n falla, las historias ya quedaron guardadas.
+export const notificarHistoriasGeneradas = createServerFn({ method: "POST" })
+  .inputValidator((d) =>
+    z
+      .object({
+        proyecto: z.string().min(1).max(500),
+        url: z.string().url().max(1000),
+        historias: z
+          .array(
+            z.object({
+              codigo: z.string().max(100).nullable(),
+              titulo: z.string().min(1).max(500),
+              prioridad: z.string().max(50),
+            }),
+          )
+          .min(1)
+          .max(20),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    const webhookUrl = process.env["N8N_WEBHOOK_URL"];
+    if (!webhookUrl) return { enviado: false };
+
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          evento: "historias.generadas",
+          fecha: new Date().toISOString(),
+          ...data,
+        }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) console.error("[notificarHistoriasGeneradas] n8n respondió", res.status);
+      return { enviado: res.ok };
+    } catch (e) {
+      console.error("[notificarHistoriasGeneradas]", e);
+      return { enviado: false };
+    }
+  });

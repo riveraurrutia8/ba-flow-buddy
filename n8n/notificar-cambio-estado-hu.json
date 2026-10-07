@@ -48,7 +48,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        240,
+        500,
         200
       ]
     },
@@ -70,7 +70,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        500,
+        760,
         80
       ],
       "onError": "continueRegularOutput",
@@ -87,7 +87,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        740,
+        1000,
         80
       ]
     },
@@ -120,7 +120,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1220,
+        1480,
         80
       ]
     },
@@ -137,7 +137,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1480,
+        1740,
         -20
       ]
     },
@@ -154,7 +154,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1480,
+        1740,
         180
       ]
     },
@@ -171,7 +171,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        740,
+        1000,
         340
       ]
     },
@@ -186,7 +186,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        980,
+        1240,
         80
       ]
     },
@@ -201,8 +201,73 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        500,
+        760,
         340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bab00000-0000-4000-8000-00000000000b",
+              "leftValue": "={{ $json.body.evento }}",
+              "rightValue": "historias.generadas",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bab00000-0000-4000-8000-00000000000b",
+      "name": "¿Qué evento?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ analizado: false }) }}",
+        "options": {}
+      },
+      "id": "bac00000-0000-4000-8000-00000000000c",
+      "name": "Responder recibido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "TU_CHAT_ID",
+        "text": "=🤖 La IA agregó {{ $json.body.historias.length }} {{ $json.body.historias.length === 1 ? 'historia' : 'historias' }} al backlog\n\n📁 Proyecto: {{ $json.body.proyecto }}\n\n{{ $json.body.historias.map(h => '• ' + (h.codigo ? h.codigo + ' · ' : '') + h.titulo + ' (' + h.prioridad + ')').join('\\n') }}\n\nEntran como Borrador: revísalas y agrega sus criterios.\n🔗 {{ $json.body.url }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "bad00000-0000-4000-8000-00000000000d",
+      "name": "Aviso de historias generadas",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        520
       ]
     }
   ],
@@ -211,7 +276,7 @@
       "main": [
         [
           {
-            "node": "¿Requiere análisis?",
+            "node": "¿Qué evento?",
             "type": "main",
             "index": 0
           }
@@ -292,6 +357,35 @@
         [
           {
             "node": "Aviso de cambio de estado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Qué evento?": {
+      "main": [
+        [
+          {
+            "node": "Responder recibido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "¿Requiere análisis?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder recibido": {
+      "main": [
+        [
+          {
+            "node": "Aviso de historias generadas",
             "type": "main",
             "index": 0
           }

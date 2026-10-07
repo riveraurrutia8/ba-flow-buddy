@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, PRIORIDADES, type Historia, type Proyecto } from "@/lib/baflow";
 import { sugerirHistorias } from "@/lib/historias-ai.functions";
+import { notificarHistoriasGeneradas } from "@/lib/notificaciones.functions";
 
 type Sugerida = {
   key: number;
@@ -49,6 +50,7 @@ export function GeneradorHistorias({
 }) {
   const qc = useQueryClient();
   const sugerir = useServerFn(sugerirHistorias);
+  const notificar = useServerFn(notificarHistoriasGeneradas);
   const [sugeridas, setSugeridas] = useState<Sugerida[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,8 +99,9 @@ export function GeneradorHistorias({
         queryFn: () => api.listHistorias(),
       });
       const codigos = siguientesCodigos(todas, elegidas.length);
+      const creadas: Historia[] = [];
       for (const [i, s] of elegidas.entries()) {
-        await api.createHistoria({
+        const h = await api.createHistoria({
           proyecto_id: proyecto.id,
           codigo: codigos.at(i) ?? null,
           titulo: s.titulo.trim(),
@@ -108,10 +111,24 @@ export function GeneradorHistorias({
           prioridad: s.prioridad,
           estado: "Borrador",
         });
+        creadas.push(h);
       }
-      return elegidas.length;
+      return creadas;
     },
-    onSuccess: (n) => {
+    onSuccess: (creadas) => {
+      const n = creadas.length;
+      // En segundo plano: avisa al equipo por Telegram (vía n8n) de las historias nuevas.
+      void notificar({
+        data: {
+          proyecto: proyecto.nombre,
+          url: `${window.location.origin}/proyectos/${proyecto.id}?tab=backlog`,
+          historias: creadas.map((h) => ({
+            codigo: h.codigo,
+            titulo: h.titulo,
+            prioridad: h.prioridad,
+          })),
+        },
+      }).catch(() => {});
       toast.success(
         n === 1 ? "Se agregó 1 historia al backlog." : `Se agregaron ${n} historias al backlog.`,
       );
